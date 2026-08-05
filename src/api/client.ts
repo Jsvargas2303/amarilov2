@@ -1,0 +1,42 @@
+import axios from 'axios'
+import { store } from '../store'
+import { logout } from '../store/authSlice'
+import { getApiLang } from '../i18n/apiLang'
+
+export const apiClient = axios.create({
+  baseURL:
+    import.meta.env.VITE_API_BASE_URL ||
+    'https://dev-stage-amarilo.pantheonsite.io/api',
+  timeout: 15000,
+  headers: {
+    'Content-Type': 'application/json',
+  },
+})
+
+apiClient.interceptors.request.use((config) => {
+  const rawToken = store.getState().auth.token ?? import.meta.env.VITE_JWT_TOKEN
+  const token =
+    rawToken && !['', 'none', '-', 'null', 'undefined'].includes(String(rawToken).trim())
+      ? String(rawToken).trim()
+      : null
+
+  if (token) {
+    config.headers.Authorization = `Bearer ${token}`
+  }
+
+  const lang = getApiLang()
+  config.params = { ...config.params, lang }
+
+  return config
+})
+
+apiClient.interceptors.response.use(
+  (response) => response,
+  (error) => {
+    if (error.response?.status === 401) {
+      store.dispatch(logout())
+    }
+
+    return Promise.reject(error)
+  },
+)
